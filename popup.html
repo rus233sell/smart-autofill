@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Smart Autofill</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 420px;
+      min-height: 200px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #f8f9fa;
+    }
+
+    /* Header bar */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .header-subtitle {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 1px;
+    }
+
+    /* Toggle switch */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #ccc;
+    }
+
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #444;
+      border-radius: 20px;
+      transition: background 0.2s;
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    input:checked + .slider {
+      background: #4ade80;
+    }
+
+    input:checked + .slider::before {
+      transform: translateX(18px);
+    }
+
+    /* Action strip */
+    .action-strip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .btn-fill {
+      flex: 1;
+      padding: 9px 16px;
+      background: #1a1a2e;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-fill:hover {
+      background: #2d2d4e;
+    }
+
+    .btn-fill:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    /* Fill result badge */
+    .fill-result {
+      font-size: 11px;
+      color: #6b7280;
+      white-space: nowrap;
+      min-width: 100px;
+      text-align: right;
+    }
+
+    .fill-result.success {
+      color: #16a34a;
+      font-weight: 500;
+    }
+
+    .fill-result.warn {
+      color: #d97706;
+    }
+
+    /* Profile form wrapper */
+    .form-wrapper {
+      max-height: 480px;
+      overflow-y: auto;
+      padding: 0 16px 16px;
+      background: #f8f9fa;
+    }
+
+    /* Section headers */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #6b7280;
+      margin: 16px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    /* Field grid */
+    .field-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .field-group label {
+      font-size: 11px;
+      color: #374151;
+      font-weight: 500;
+      margin-bottom: 3px;
+    }
+
+    .field-group input,
+    .field-group select,
+    .field-group textarea {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 12px;
+      color: #1a1a1a;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .field-group input:focus,
+    .field-group select:focus,
+    .field-group textarea:focus {
+      border-color: #1a1a2e;
+    }
+
+    .field-group textarea {
+      resize: vertical;
+      min-height: 72px;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+
+    .field-group select {
+      appearance: auto;
+    }
+
+    /* Save button */
+    .footer {
+      padding: 12px 16px;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .btn-save {
+      padding: 8px 20px;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-save:hover {
+      background: #15803d;
+    }
+
+    .save-status {
+      font-size: 12px;
+      color: #16a34a;
+      align-self: center;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .save-status.visible {
+      opacity: 1;
+    }
+
+    /* Scrollbar styling */
+    .form-wrapper::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .form-wrapper::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .form-wrapper::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+
+    /* Helper text */
+    .hint {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+
+    /* Shortcut reminder */
+    .shortcut-hint {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 2px;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 1px 4px;
+      border: 1px solid #d1d5db;
+      border-radius: 3px;
+      font-size: 10px;
+      font-family: monospace;
+      background: #f3f4f6;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="header-title">Smart Autofill</div>
+      <div class="header-subtitle">Job application autofill</div>
+    </div>
+    <div class="toggle-wrap">
+      <span id="toggle-label">On</span>
+      <label class="toggle" title="Enable or disable autofill">
+        <input type="checkbox" id="enabled-toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Fill action and result -->
+  <div class="action-strip">
+    <button class="btn-fill" id="fill-btn">Fill This Page</button>
+    <div class="fill-result" id="fill-result">
+      <span class="shortcut-hint">or <kbd>Ctrl+Shift+F</kbd></span>
+    </div>
+  </div>
+
+  <!-- Profile form -->
+  <div class="form-wrapper">
+    <form id="profile-form" autocomplete="off">
+
+      <!-- Personal -->
+      <div class="section-label">Personal</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-firstName">First Name</label>
+          <input type="text" id="f-firstName" name="firstName" placeholder="Jane">
+        </div>
+        <div class="field-group">
+          <label for="f-lastName">Last Name</label>
+          <input type="text" id="f-lastName" name="lastName" placeholder="Smith">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-fullName">Full Name <span style="color:#9ca3af;font-weight:400">(used when form has one name field)</span></label>
+          <input type="text" id="f-fullName" name="fullName" placeholder="Jane Smith">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-pronouns">Pronouns (optional)</label>
+          <input type="text" id="f-pronouns" name="pronouns" placeholder="she/her">
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div class="section-label">Contact</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-email">Email</label>
+          <input type="email" id="f-email" name="email" placeholder="jane@example.com">
+        </div>
+        <div class="field-group">
+          <label for="f-phone">Phone</label>
+          <input type="tel" id="f-phone" name="phone" placeholder="5555555555">
+          <div class="hint">Store digits only - format is auto-detected</div>
+        </div>
+      </div>
+
+      <!-- Address -->
+      <div class="section-label">Address</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-street">Street Address</label>
+          <input type="text" id="f-street" name="street" placeholder="123 Main St">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-city">City</label>
+          <input type="text" id="f-city" name="city" placeholder="San Francisco">
+        </div>
+        <div class="field-group">
+          <label for="f-state">State / Province</label>
+          <input type="text" id="f-state" name="state" placeholder="California">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-zip">ZIP / Postal Code</label>
+          <input type="text" id="f-zip" name="zip" placeholder="94105">
+        </div>
+        <div class="field-group">
+          <label for="f-country">Country</label>
+          <input type="text" id="f-country" name="country" placeholder="United States">
+        </div>
+      </div>
+
+      <!-- Online Presence -->
+      <div class="section-label">Online Presence</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-linkedin">LinkedIn URL</label>
+          <input type="url" id="f-linkedin" name="linkedin" placeholder="https://linkedin.com/in/janesmith">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-github">GitHub URL</label>
+          <input type="url" id="f-github" name="github" placeholder="https://github.com/janesmith">
+        </div>
+        <div class="field-group">
+          <label for="f-website">Personal Website / Portfolio</label>
+          <input type="url" id="f-website" name="website" placeholder="https://janesmith.dev">
+        </div>
+      </div>
+
+      <!-- Education -->
+      <div class="section-label">Education</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-university">University / School</label>
+          <input type="text" id="f-university" name="university" placeholder="University of California, Berkeley">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-degree">Degree</label>
+          <input type="text" id="f-degree" name="degree" placeholder="Bachelor of Science">
+        </div>
+        <div class="field-group">
+          <label for="f-major">Major / Field of Study</label>
+          <input type="text" id="f-major" name="major" placeholder="Computer Science">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-graduationDate">Graduation Date</label>
+          <input type="text" id="f-graduationDate" name="graduationDate" placeholder="YYYY-MM-DD">
+          <div class="hint">Store as YYYY-MM-DD - format is auto-detected per form</div>
+        </div>
+        <div class="field-group">
+          <label for="f-gpa">GPA</label>
+          <input type="text" id="f-gpa" name="gpa" placeholder="3.8">
+        </div>
+      </div>
+
+      <!-- Work Experience -->
+      <div class="section-label">Work Experience</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-currentJobTitle">Current Job Title</label>
+          <input type="text" id="f-currentJobTitle" name="currentJobTitle" placeholder="Software Engineer">
+        </div>
+        <div class="field-group">
+          <label for="f-targetJobTitle">Target / Desired Job Title</label>
+          <input type="text" id="f-targetJobTitle" name="targetJobTitle" placeholder="Senior Software Engineer">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-yearsExperience">Years of Experience</label>
+          <input type="text" id="f-yearsExperience" name="yearsExperience" placeholder="5">
+        </div>
+      </div>
+
+      <!-- Employment Eligibility -->
+      <div class="section-label">Employment Eligibility</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-authorizedToWork">Authorized to Work in US</label>
+          <select id="f-authorizedToWork" name="authorizedToWork">
+            <option value="">-- select --</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="f-requireSponsorship">Require Visa Sponsorship</label>
+          <select id="f-requireSponsorship" name="requireSponsorship">
+            <option value="">-- select --</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-salaryExpectation">Salary Expectation</label>
+          <input type="text" id="f-salaryExpectation" name="salaryExpectation" placeholder="120000">
+        </div>
+        <div class="field-group">
+          <label for="f-availability">Availability / Start Date</label>
+          <input type="text" id="f-availability" name="availability" placeholder="YYYY-MM-DD">
+          <div class="hint">Store as YYYY-MM-DD - format is auto-detected</div>
+        </div>
+      </div>
+
+      <!-- About / Bio -->
+      <div class="section-label">About / Bio</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-bio">Short Bio / Summary</label>
+          <textarea id="f-bio" name="bio" placeholder="Write a 2-4 sentence professional summary to fill open text fields asking 'tell us about yourself'..."></textarea>
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Footer with save -->
+  <div class="footer">
+    <span class="save-status" id="save-status">Saved</span>
+    <button class="btn-save" id="save-btn">Save Profile</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
